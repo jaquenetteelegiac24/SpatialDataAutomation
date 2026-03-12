@@ -7,37 +7,23 @@ let mapLayerGroup = null;
 let mapOrderLines = null;
 let sortableList = null;
 
-let darkLayer, lightLayer;
-let isDarkMap = true;
+let lightLayer;
 
 // --- INIT LEAFLET MAP ---
 document.addEventListener('DOMContentLoaded', () => {
     map = L.map('map').setView([-7.250445, 112.768845], 11); // Surabaya default
 
-    // Bikin 2 opsi layer map
-    darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB' });
+    // Set layer map ke OpenStreetMap (Light)
     lightLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
 
-    // Set default ke dark
-    darkLayer.addTo(map);
+    // Set default ke light
+    lightLayer.addTo(map);
 
     mapLayerGroup = L.layerGroup().addTo(map);
     mapOrderLines = L.polyline([], {color: '#f85149', dashArray: '5, 5', weight: 2}).addTo(map);
     
     initSortable();
     addRuleRow(); // Add empty rule row on start
-});
-
-// --- TOGGLE MAP THEME (DARK / LIGHT) ---
-document.getElementById('toggleThemeBtn').addEventListener('click', () => {
-    if (isDarkMap) {
-        map.removeLayer(darkLayer);
-        lightLayer.addTo(map);
-    } else {
-        map.removeLayer(lightLayer);
-        darkLayer.addTo(map);
-    }
-    isDarkMap = !isDarkMap;
 });
 
 // --- FILE UPLOAD LOGIC ---

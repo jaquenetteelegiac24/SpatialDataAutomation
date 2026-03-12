@@ -5,25 +5,7 @@
 }
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --card-border: 210 18% 87%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --border: 210 18% 87%;
-  --input: 210 18% 87%;
-  --radius: 6px;
-  --font-sans: 'Inter', sans-serif;
-}
-
-html.dark {
+  /* Diambil dari warna html.dark sebelumnya */
   --background: 216 28% 7%;
   --foreground: 210 17% 95%;
   --card: 215 21% 11%;
@@ -38,10 +20,14 @@ html.dark {
   --accent: 212 12% 21%;
   --border: 212 12% 21%;
   --input: 212 12% 21%;
+  --radius: 6px;
+  --font-sans: 'Inter', sans-serif;
 }
 
 html {
   scroll-behavior: smooth;
+  scroll-snap-type: y mandatory; /* Mengaktifkan fitur snap vertikal (sumbu Y) */
+  scroll-padding-top: 80px; /* Ngasih jarak aman biar pas nge-snap, konten ga ketutupan navbar lu yang fixed */
 }
 
 body {
@@ -286,6 +272,17 @@ a {
 }
 
 /* Hero Section */
+/* Bikin semua section di dalam tag <main> nge-snap pas di-scroll */
+main section {
+  scroll-snap-align: start; /* Titik berhentinya pas di bagian atas tiap section */
+  scroll-snap-stop: always; /* Memaksa berhenti di tiap section, biar user ga kebablasan skip section kalau scroll-nya kenceng */
+}
+
+/* (Opsional) Biar Footer juga ikutan nge-snap di bagian bawah */
+.footer {
+  scroll-snap-align: end;
+}
+
 .hero {
   position: relative;
   min-height: 100vh;
@@ -303,11 +300,22 @@ a {
   transform: translate(-50%, -50%);
   width: 800px;
   height: 800px;
-  background: radial-gradient(circle, hsl(var(--primary) / 0.05) 0%, transparent 70%);
   border-radius: 50%;
   filter: blur(100px);
   pointer-events: none;
   z-index: -1;
+}
+
+
+/* Konten Hero dinaikin z-index nya biar ga ketutupan grid */
+.hero-content {
+  position: relative;
+  z-index: 10;
+  pointer-events: none; /* Biar kursor tembus ke background */
+}
+
+.hero-content * {
+  pointer-events: auto; /* Balikin pointer buat tombol-tombol di dalemnya */
 }
 
 .hero-content {
@@ -355,7 +363,7 @@ a {
   font-size: 1.125rem;
   color: hsl(var(--muted-foreground));
   margin-bottom: 40px;
-  max-width: 560px;
+  max-width: 640px;
   margin-left: auto;
   margin-right: auto;
   line-height: 1.6;
@@ -406,7 +414,7 @@ a {
 
 .tools-header p {
   color: hsl(var(--muted-foreground));
-  max-width: 448px;
+  max-width: 640px;
 }
 
 .carousel-controls {

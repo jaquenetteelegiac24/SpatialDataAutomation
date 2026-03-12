@@ -1,29 +1,3 @@
-// Theme Toggle
-const themeToggle = document.getElementById('theme-toggle');
-const html = document.documentElement;
-const sunIcon = themeToggle.querySelector('.sun-icon');
-const moonIcon = themeToggle.querySelector('.moon-icon');
-
-const savedTheme = localStorage.getItem('theme') || 'light';
-html.classList.toggle('dark', savedTheme === 'dark');
-updateThemeIcons();
-
-themeToggle.addEventListener('click', () => {
-  const isDark = html.classList.toggle('dark');
-  localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  updateThemeIcons();
-});
-
-function updateThemeIcons() {
-  if (html.classList.contains('dark')) {
-    sunIcon.style.display = 'block';
-    moonIcon.style.display = 'none';
-  } else {
-    sunIcon.style.display = 'none';
-    moonIcon.style.display = 'block';
-  }
-}
-
 // Navbar Scroll Effect
 const navbar = document.getElementById('navbar');
 let lastScrollY = 0;
@@ -57,9 +31,24 @@ if (track && container) {
   const cards = Array.from(track.children);
   
   // Gandakan card lebih banyak (4x) biar scroll-nya terasa benar-benar infinite
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 2; i++) {
     cards.forEach(card => track.appendChild(card.cloneNode(true)));
   }
+
+ // --- TAMBAHAN: INJECT EASTER EGG DI UJUNG TRACK ---
+  const easterEggHTML = `
+    <div class="tool-card fade-in-scroll" style="scroll-snap-align: center !important; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; border: none; background-color: black; overflow: hidden; cursor: default;">
+      <img src="Whoops.jpg" alt="Smug Spongebob" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.35; z-index: 1; border-radius: inherit;">
+      <div style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <h3 style="margin: 0; font-size: 1.1rem; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">You like scrolling, don't you?</h3>
+        <p style="margin: 0; font-size: 0.9rem; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">Whoops! Currently we only have 4 tools built. Another web apps are still cooking in the lab. Stay tuned!</p>
+      </div>
+    </div>
+    
+    <div style="flex: 0 0 auto; width: calc(50vw - 405px); pointer-events: none;"></div>
+  `;
+  track.insertAdjacentHTML('beforeend', easterEggHTML);
+  // ------------------------------------------------
 
   // Fungsi buat ngitung jarak geser (Lebar Card + Gap 24px) secara live
   const getSnapDistance = () => track.children[0].offsetWidth + 24;
@@ -131,3 +120,74 @@ if (contactForm) {
     setTimeout(() => { formSuccess.style.display = 'none'; }, 5000);
   });
 }
+
+// ==========================================
+// Custom Vertical Scroll Snap with Speed Ramp
+// ==========================================
+let currentSectionIndex = 0;
+const sections = document.querySelectorAll('main section'); // Ngambil semua section
+let isScrolling = false;
+
+// Rumus Speed Ramp (easeInOutQuint): Pelan -> Ngebut -> Pelan
+function easeInOutQuint(t) {
+  return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+}
+
+function scrollToSection(index) {
+  // Cegah error kalau index kelewat batas
+  if (index < 0 || index >= sections.length) return;
+
+  isScrolling = true;
+  currentSectionIndex = index;
+
+  const targetPosition = sections[index].offsetTop - 80; // Dikurangi 80px biar ga ketutup navbar
+  const startPosition = window.scrollY;
+  const distance = targetPosition - startPosition;
+  
+  const duration = 150; // Waktu animasi (1200ms = 1.2 detik). Ganti aja kalau kurang cepet/lambat
+  let startTime = null;
+
+  function animation(currentTime) {
+    if (startTime === null) startTime = currentTime;
+    const timeElapsed = currentTime - startTime;
+    const progress = Math.min(timeElapsed / duration, 1);
+
+    // Terapin efek speed ramp ke progress scroll
+    const ease = easeInOutQuint(progress);
+
+    window.scrollTo(0, startPosition + distance * ease);
+
+    // Kalau animasi belum selesai, lanjutin
+    if (timeElapsed < duration) {
+      requestAnimationFrame(animation);
+    } else {
+      // Kasih jeda dikit sebelum user bisa scroll lagi (mencegah double-scroll di trackpad sensitif)
+      setTimeout(() => { isScrolling = false; }, 200); 
+    }
+  }
+
+  requestAnimationFrame(animation);
+}
+
+// Pantau scroll dari mouse wheel / trackpad
+window.addEventListener('wheel', (e) => {
+  // PENTING: Biarin user tetep bisa scroll horizontal di Carousel tanpa keganggu
+  if (e.target.closest('.carousel-container')) return;
+
+  e.preventDefault(); // Matiin scroll bawaan browser
+  if (isScrolling) return; // Kalau lagi jalan animasinya, abaikan scroll baru
+
+  // --- TRICK TOUCHPAD (Mencegah bablas ke bawah) ---
+  // Trackpad ngirim sisa inersia berupa angka scroll kecil (di bawah 40). 
+  // Mouse biasa angkanya selalu gede (biasanya 100).
+  // Jadi kalau angkanya kekecilan, kita cuekin aja biar nggak pindah page.
+  if (Math.abs(e.deltaY) < 40) return; 
+  // ------------------------------------------------
+
+  // Deteksi arah scroll (bawah atau atas)
+  if (e.deltaY > 0) {
+    scrollToSection(currentSectionIndex + 1); // Scroll Bawah
+  } else {
+    scrollToSection(currentSectionIndex - 1); // Scroll Atas
+  }
+}, { passive: false });
