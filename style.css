@@ -288,8 +288,7 @@ main section {
   min-height: 100vh;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding-top: 80px;
+  justify-content: flex-start;
   overflow: hidden;
 }
 
@@ -385,6 +384,13 @@ main section {
 
 /* Tools Section */
 .tools {
+  /* Biar sectionnya punya minimal tinggi sesuai yang lu mau */
+  min-height: 100vh; /* <-- Bebas mau 50vh atau 100vh */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* <-- INI KUNCINYA. Biar konten tetep nempel di atas, dan sisa space numpuk di bawah */
+
+  /* Kode bawaan lu tetep biarin aja */
   padding: 96px 24px;
   background-color: hsl(var(--card) / 0.3);
   border-top: 1px solid hsl(var(--border));
@@ -392,6 +398,7 @@ main section {
 }
 
 .tools-header {
+  width: 100%; /* <-- TAMBAHIN INI BIAR NGELEBAR */
   max-width: 1280px;
   margin: 0 auto 48px;
   display: flex;
@@ -399,11 +406,12 @@ main section {
   gap: 24px;
 }
 
+/* Biarin media query bawahnya tetep gini (ga usah diubah) */
 @media (min-width: 768px) {
   .tools-header {
     flex-direction: row;
     align-items: flex-end;
-    justify-content: space-between;
+    justify-content: space-between; /* Ini yang bikin panah kelempar ke kanan */
   }
 }
 
@@ -631,8 +639,8 @@ main section {
 
 /* Contact Section Split Layout */
 .contact-split {
-  padding: 128px 24px;
-  max-width: 1280px;
+  padding: 0 24px;
+  max-width: 1380px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr;
@@ -766,7 +774,7 @@ main section {
 .footer {
   border-top: 1px solid hsl(var(--border));
   background-color: hsl(var(--background));
-  padding: 48px 24px;
+  padding: 16px 24px; /* <--- UBAH INI: awalnya 48px, kecilin jadi 16px biar tipis */
 }
 
 .footer-content {

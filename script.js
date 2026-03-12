@@ -31,7 +31,7 @@ if (track && container) {
   const cards = Array.from(track.children);
   
   // Gandakan card lebih banyak (4x) biar scroll-nya terasa benar-benar infinite
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 4; i++) {
     cards.forEach(card => track.appendChild(card.cloneNode(true)));
   }
 
@@ -140,14 +140,24 @@ function scrollToSection(index) {
   isScrolling = true;
   currentSectionIndex = index;
 
-  const targetPosition = sections[index].offsetTop - 80; // Dikurangi 80px biar ga ketutup navbar
+  // --- UBAH BAGIAN INI ---
+  let targetPosition = sections[index].offsetTop - 80;
+  
+  // Deteksi kalau ini section paling terakhir (Contact + Footer)
+  // Hapus minus 80-nya biar scroll mentok ke dasar layar dan footer ga kepotong
+  if (index === sections.length - 1) {
+    targetPosition = sections[index].offsetTop; 
+  }
+  // -----------------------
+
   const startPosition = window.scrollY;
   const distance = targetPosition - startPosition;
   
-  const duration = 150; // Waktu animasi (1200ms = 1.2 detik). Ganti aja kalau kurang cepet/lambat
+  const duration = 150; // Waktu animasi
   let startTime = null;
 
   function animation(currentTime) {
+    // ... (sisa kode animasi di bawahnya biarin sama aja)
     if (startTime === null) startTime = currentTime;
     const timeElapsed = currentTime - startTime;
     const progress = Math.min(timeElapsed / duration, 1);
