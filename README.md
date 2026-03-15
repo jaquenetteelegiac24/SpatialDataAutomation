@@ -32,6 +32,8 @@ To run this project on your local machine, you don't need any complex build tool
 
 Life is too short to do repetitive spatial data tasks manually. If you're interested in collaborating or need a custom build for your team's workflow, let's talk!
 
+
+* **Portfolio & Projects:** [naradevane.vercel.app](https://naradevane.vercel.app/)
 * **LinkedIn:** [Ikhsanudin (Naradevane)](https://www.linkedin.com/in/naradevane/)
 * **GitHub:** [@naradevane](https://github.com/naradevane)
 * **Email:** naradevane@gmail.com
