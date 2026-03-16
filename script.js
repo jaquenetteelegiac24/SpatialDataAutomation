@@ -41,7 +41,7 @@ if (track && container) {
       <img src="assets/Whoops.jpg" alt="Smug Spongebob" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.35; z-index: 1; border-radius: inherit;">
       <div style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px;">
         <h3 style="margin: 0; font-size: 1.1rem; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">You like scrolling, don't you?</h3>
-        <p style="margin: 0; font-size: 0.9rem; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">Whoops! Currently we only have 4 tools built. Another web apps are still cooking in the lab. Stay tuned!</p>
+        <p style="margin: 0; font-size: 0.9rem; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">Whoops! Currently we only have 5 tools built. Another web apps are still cooking in the lab. Stay tuned!</p>
       </div>
     </div>
     
