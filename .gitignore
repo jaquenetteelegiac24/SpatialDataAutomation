@@ -1,2 +1,5 @@
 # Abaikan file source code original
 kmz-emr-standard\js\logic-features-devOnly.js
+.vercel
+.env*.local
+.env

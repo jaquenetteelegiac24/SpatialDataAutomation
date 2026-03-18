@@ -1929,7 +1929,7 @@ export async function testScrapeFatAddresses(xmlDoc, onProgress = null) {
     try {
         const finalResults = await Promise.all(fatDataList.map(async (fat) => {
             try {
-                const response = await fetch('/api/get-address', {
+                const response = await fetch('../api/get-address', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ lat: fat.lat, lng: fat.lng }),
