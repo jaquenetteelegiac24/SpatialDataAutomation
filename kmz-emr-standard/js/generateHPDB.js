@@ -9,23 +9,19 @@
  * * A copy of the license is located in the LICENSE file in the root directory, 
  * or can be found at: https://polyformproject.org/licenses/strict/1.0.0/
  */
- 
-/* IMPORT KONFIGURASI YANG DIBUTUHKAN */
+
 import { haversine, ENABLE_COORD_ROUNDING, ROUND_LAT, ROUND_LON } from './config-utils.js';
 
-/* ================= STATE MANAGEMENT (Dihapus karena pakai Worker) ================= */
-// Kita biarkan fungsi kosong agar tidak error di main.js saat dipanggil resetHPDBState()
 export function resetHPDBState() {}
 
-/* ================= HELPER: COORDINATE FORMATTER ================= */
 function fmtCoord(val, digits) {
     if (!ENABLE_COORD_ROUNDING) return val; 
     if (typeof val !== 'number') return val;
     return parseFloat(val.toFixed(digits)); 
 }
 
-/* ================= MAIN FUNCTION: EXTRACT & SEND TO WORKER ================= */
-export function generateExcelHPDB(xmlDoc, rootNameRaw) {
+// ---> UPDATE: Tambah parameter scrapedData = null
+export function generateExcelHPDB(xmlDoc, rootNameRaw, scrapedData = null) {
     return new Promise((resolve, reject) => {
         const fdtGroups = {}; 
         const dashboardData = {}; 
@@ -33,7 +29,6 @@ export function generateExcelHPDB(xmlDoc, rootNameRaw) {
         const rootFolder = Array.from(xmlDoc.querySelectorAll('Folder')).find(f => f.querySelector('name')?.textContent === rootNameRaw);
         if (!rootFolder) return resolve(null);
 
-        // --- 1. PROSES EKSTRAKSI XML KE JSON ---
         const lineFolders = Array.from(rootFolder.children).filter(child => {
             const n = child.querySelector('name')?.textContent || '';
             return child.tagName === 'Folder' && !['OTHERS', 'FDT', 'BOUNDARY CLUSTER'].includes(n);
@@ -92,25 +87,58 @@ export function generateExcelHPDB(xmlDoc, rootNameRaw) {
                         });
                     }
 
+                    // ==========================================
+                    // INJEKSI DATA API & HARDCODE
+                    // ==========================================
+                    let streetName = '';
+                    let admData = { 
+                        desa: 'BALONGGEDE', kecamatan: 'REGOL', kabupaten: 'BANDUNG', 
+                        provinsi: 'JAWA BARAT', kodepos: '40251' 
+                    };
+
+                    if (scrapedData) {
+                        const fatAddress = scrapedData.find(d => d.fatName === subName);
+                        if (fatAddress) {
+                            let rawJalan = (fatAddress.jalan || '').toUpperCase().trim();
+                            if (rawJalan && rawJalan !== '-') {
+                                if (!rawJalan.includes('JALAN ') && !rawJalan.includes('GG. ') && !rawJalan.includes('GANG ')) {
+                                    streetName = 'JALAN ' + rawJalan;
+                                } else {
+                                    streetName = rawJalan;
+                                }
+                            }
+                            admData = {
+                                desa: (fatAddress.desa || '-').toUpperCase(),
+                                kecamatan: (fatAddress.kecamatan || '-').toUpperCase(),
+                                kabupaten: (fatAddress.kabupaten || '-').toUpperCase(),
+                                provinsi: (fatAddress.provinsi || '-').toUpperCase(),
+                                kodepos: fatAddress.kodepos || '-'
+                            };
+                        }
+                    }
+
                     const hpPlacemarks = sub.querySelectorAll('Placemark');
                     
                     dashboardData[fdtID].push({
                         fatName: subName,
-                        count: hpPlacemarks.length
+                        count: hpPlacemarks.length,
+                        streetName: streetName // <--- INI PENTING
                     });
 
                     hpPlacemarks.forEach(hp => {
                         const pt = hp.querySelector('Point coordinates');
                         if (pt) {
                             const [hpLon, hpLat] = pt.textContent.trim().split(',').map(Number);
-                                fdtGroups[fdtID].push({
+                            fdtGroups[fdtID].push({
                                 poleId: anchorPole.name,
                                 poleLat: fmtCoord(anchorPole.lat, ROUND_LAT),
                                 poleLon: fmtCoord(anchorPole.lon, ROUND_LON),
                                 hpName: hp.querySelector('name')?.textContent.trim() || '',
                                 lineName: lineFolderName,
                                 fatCode: fatCode,
-                                fullFatName: subName, // <--- INI WAJIB ADA BROK!
+                                fullFatName: subName,
+                                streetName: streetName,  // <--- INI PENTING
+                                ...admData,              // <--- INI SANGAT PENTING
                                 hpLat: fmtCoord(hpLat, ROUND_LAT),
                                 hpLon: fmtCoord(hpLon, ROUND_LON)
                             });
@@ -120,24 +148,19 @@ export function generateExcelHPDB(xmlDoc, rootNameRaw) {
             }
         });
 
-        // --- 2. KIRIM DATA KE WEB WORKER ---
         if (window.Worker) {
             const worker = new Worker('js/hpdb.worker.js');
-            
-            // Hapus allFdtInfo, balikin jadi cuma ngirim 2 data utama ini:
             worker.postMessage({ fdtGroups, dashboardData }); 
 
             worker.onmessage = function(e) {
                 if (e.data.status === 'success') {
-                    // Buat Blob dari file excel (ArrayBuffer) yang dikirim worker
                     const blob = new Blob([e.data.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                     resolve(blob);
                 } else {
                     reject(e.data.error);
                 }
-                worker.terminate(); // Matikan worker setelah selesai
+                worker.terminate();
             };
-
             worker.onerror = function(err) {
                 reject(err.message);
                 worker.terminate();

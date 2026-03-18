@@ -706,7 +706,7 @@ export function generateAutoSlack(xmlDoc) {
     });
 }
 
-export function generateAutoSlackSubfeeder(xmlDoc) {
+export function generateAutoSlackSubfeeder(xmlDoc, enableAuto400m = false) {
     const INTERVAL_SLACK = 400; // Taruh slack tiap 400 meter
     const MIN_DIST_TO_END = 20; // Jarak aman ke ujung biar ga dobel
     const CABLE_DETECT_TOLERANCE = 15; // Toleransi radius deteksi
@@ -753,6 +753,9 @@ export function generateAutoSlackSubfeeder(xmlDoc) {
             const placedSlacks = [];
             const anchorPoints = [];
 
+            // =======================================================
+            // BAGIAN INI ALWAYS ON: Taro slack di Anchor (FDT & JC)
+            // =======================================================
             [jcFolder, fdtFolder].forEach(targetFolder => {
                 if (targetFolder) {
                     targetFolder.querySelectorAll('Placemark').forEach(pm => {
@@ -795,7 +798,10 @@ export function generateAutoSlackSubfeeder(xmlDoc) {
                 }
             });
 
-            if (cableFolder) {
+            // =======================================================
+            // BAGIAN INI TOGGLEABLE: Taro slack tiap 400m
+            // =======================================================
+            if (enableAuto400m && cableFolder) {
                 cableFolder.querySelectorAll('Placemark').forEach(cablePm => {
                     const ls = cablePm.querySelector('LineString coordinates');
                     if (!ls) return;
@@ -1873,4 +1879,165 @@ export function splitSlingWires(xmlDoc) {
             pm.remove(); // Bye bye Trojan Horse!
         }
     });
+}
+
+/* ================= FITUR BARU: SCRAPE ALAMAT PER FAT ================= */
+export let scrapeAbortController = null;
+
+export function cancelScrape() {
+    if (scrapeAbortController) {
+        scrapeAbortController.abort();
+        console.log("🛑 PROSES SCRAPE DIBATALKAN OLEH USER!");
+    }
+}
+
+// ---> TAMBAHAN: Parameter onProgress buat update UI
+export async function testScrapeFatAddresses(xmlDoc, onProgress = null) {
+    console.log("🔍 Memulai pencarian titik FAT...");
+    const allFolders = Array.from(xmlDoc.querySelectorAll('Folder'));
+    const fatDataList = [];
+
+    const lineFolders = allFolders.filter(f => f.querySelector('name')?.textContent.trim().toUpperCase().includes('LINE '));
+    lineFolders.forEach(lineFolder => {
+        const lineName = lineFolder.querySelector('name').textContent.trim();
+        const fatFolder = Array.from(lineFolder.children).find(c =>
+            c.tagName === 'Folder' && c.querySelector('name')?.textContent.trim().toUpperCase() === 'FAT'
+        );
+
+        if (fatFolder) {
+            fatFolder.querySelectorAll('Placemark').forEach(pm => {
+                const fatName = pm.querySelector('name')?.textContent.trim() || 'Unknown FAT';
+                const pt = pm.querySelector('Point coordinates');
+                if (pt) {
+                    const [lng, lat] = pt.textContent.trim().split(',').map(Number);
+                    fatDataList.push({ lineName, fatName, lat, lng });
+                }
+            });
+        }
+    });
+
+    if (fatDataList.length === 0) return null;
+
+    scrapeAbortController = new AbortController();
+    const signal = scrapeAbortController.signal;
+
+    // ---> Variabel untuk tracking progress
+    let completed = 0;
+    const total = fatDataList.length;
+    if (onProgress) onProgress(0, total, "Memulai koneksi...");
+
+    try {
+        const finalResults = await Promise.all(fatDataList.map(async (fat) => {
+            try {
+                const response = await fetch('/api/get-address', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lat: fat.lat, lng: fat.lng }),
+                    signal: signal 
+                });
+
+                const data = await response.json();
+                let resultObj = { ...fat, jalan: '-', desa: '-', kecamatan: '-', kabupaten: '-' };
+
+                if (data.success) {
+                    resultObj = { ...resultObj, ...data };
+                    
+                    // ==========================================
+                    // FITUR BARU: TEXT CLEANER / PENCUCI STRING
+                    // ==========================================
+                    const cleanTxt = (txt) => {
+                        if (!txt || txt === '-') return '-';
+                        // 1. Hapus awalan: Provinsi, Kota, Kabupaten, Kab., Kecamatan, Kec., Desa, Kelurahan, Kel.
+                        let res = txt.replace(/^(PROVINSI|KOTA|KABUPATEN|KAB\.|KECAMATAN|KEC\.|DESA|KELURAHAN|KEL\.)\s+/i, '');
+                        // 2. Hapus akhiran "CITY" (buat ngakalin Google yg sok Inggris kyk "PALU CITY")
+                        res = res.replace(/\s+CITY$/i, '');
+                        return res.trim().toUpperCase(); // Sekalian di-uppercase biar seragam
+                    };
+
+                    resultObj.provinsi = cleanTxt(resultObj.provinsi);
+                    resultObj.kabupaten = cleanTxt(resultObj.kabupaten);
+                    resultObj.kecamatan = cleanTxt(resultObj.kecamatan);
+                    resultObj.desa = cleanTxt(resultObj.desa);
+                    // ==========================================
+                }
+                
+                // ---> Lapor ke UI setiap 1 FAT selesai
+                completed++;
+                if (onProgress) onProgress(completed, total, fat.fatName);
+                
+                return resultObj;
+            } catch (err) {
+                if (err.name === 'AbortError') return null; 
+                completed++;
+                if (onProgress) onProgress(completed, total, `Error di ${fat.fatName}`);
+                return { ...fat, jalan: '-', desa: '-' };
+            }
+        }));
+
+        const validResults = finalResults.filter(r => r !== null);
+        if (validResults.length === 0) return null; // Berarti di-cancel
+
+        // (Jurus Pinjam Tetangga tetep ada di sini)
+        for (let i = 0; i < validResults.length; i++) {
+            let item = validResults[i];
+            if (!item.jalan || item.jalan === '-' || item.jalan.toLowerCase().includes('unnamed')) {
+                let tetangga = validResults.find((t, idx) => 
+                    t.lineName === item.lineName && t.jalan && t.jalan !== '-' && 
+                    !t.jalan.toLowerCase().includes('unnamed') && Math.abs(idx - i) <= 2 
+                );
+                item.jalan = tetangga ? tetangga.jalan : "Alamat Tidak Terpetakan";
+            }
+
+            // ========================================================
+            // FITUR BARU: PENYERAGAMAN HYBRID (PROVINSI & KABUPATEN AJA)
+            // DAN SMART FILL KODEPOS
+            // ========================================================
+            const frekuensi = { provinsi: {}, kabupaten: {}, kodepos: {} };
+
+            // 1. Kumpulin data buat nyari yang paling dominan (Modus)
+            validResults.forEach(item => {
+                if (item.provinsi && item.provinsi !== '-' && item.provinsi !== 'UNKNOWN') 
+                    frekuensi.provinsi[item.provinsi] = (frekuensi.provinsi[item.provinsi] || 0) + 1;
+                
+                if (item.kabupaten && item.kabupaten !== '-' && item.kabupaten !== 'UNKNOWN') 
+                    frekuensi.kabupaten[item.kabupaten] = (frekuensi.kabupaten[item.kabupaten] || 0) + 1;
+                    
+                if (item.kodepos && item.kodepos !== '-' && item.kodepos !== 'UNKNOWN') 
+                    frekuensi.kodepos[item.kodepos] = (frekuensi.kodepos[item.kodepos] || 0) + 1;
+            });
+
+            const getDominan = (obj) => Object.keys(obj).sort((a, b) => obj[b] - obj[a])[0] || '-';
+            
+            const domProvinsi = getDominan(frekuensi.provinsi);
+            const domKabupaten = getDominan(frekuensi.kabupaten);
+            const domKodeposGlobal = getDominan(frekuensi.kodepos); // Buat jaga-jaga kalau sekampung ga ada kodepos
+
+            // 2. Eksekusi Penyeragaman & Penambalan Kodepos
+            validResults.forEach(item => {
+                // A. Seragamkan Provinsi & Kabupaten secara mutlak
+                if (domProvinsi !== '-') item.provinsi = domProvinsi;
+                if (domKabupaten !== '-') item.kabupaten = domKabupaten;
+                
+                // B. Tambal Kodepos yang bolong
+                if (!item.kodepos || item.kodepos === '-') {
+                    // Cari tetangga yang desanya sama dan kodeposnya ada isinya
+                    let tetanggaDesa = validResults.find(t => t.desa === item.desa && t.kodepos && t.kodepos !== '-');
+                    
+                    if (tetanggaDesa) {
+                        item.kodepos = tetanggaDesa.kodepos; // Pinjem kodepos tetangga se-desa
+                    } else {
+                        // Kalau satu desa ga ada yang punya kodepos, pinjem kodepos dominan di project ini
+                        item.kodepos = domKodeposGlobal !== '-' ? domKodeposGlobal : '';
+                    }
+                }
+            });
+            console.log("✅ Data Administratif Hybrid Berhasil Diterapkan!");
+            // ========================================================
+        }
+
+        return validResults;
+    } catch (err) {
+        if (err.name !== 'AbortError') console.error("Fatal Error saat Promise.all:", err);
+        return null;
+    }
 }

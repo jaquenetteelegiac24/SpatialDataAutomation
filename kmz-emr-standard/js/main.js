@@ -17,8 +17,8 @@ import {
     restructureKML, restructureSubfeeder, processSmartRouting, generateAutoSlack, 
     organizeHpByBoundary, autoRepositionPoints, splitSlingWires, generateAutoSlackSubfeeder, 
     applyStyles, injectDescriptionsAndCalc, sortPlacemarksInsideFolders, generateSummaryTable,
-    resetLogicState, globalErrorLog, autoCorrectHierarchy
-} from './logic-features.js';;
+    resetLogicState, globalErrorLog, autoCorrectHierarchy, testScrapeFatAddresses, cancelScrape 
+} from './logic-features.js';
 
 import { extractBOQData } from './generateBOQ.js';
 
@@ -379,19 +379,26 @@ if (kmzInput) {
 const resetBtn = document.getElementById('resetBtn');
 if (resetBtn) {
     resetBtn.addEventListener('click', () => {
-        kmzFile = null;
-        document.getElementById('kmzFile').value = '';
-        fileLabel.textContent = 'Drag & drop KMZ/KML here';
-        fileLabel.style.color = 'var(--text-muted)';
+        // --- BAGIAN INI DIHAPUS BIAR FILE TETEP ADA ---
+        // kmzFile = null;
+        // document.getElementById('kmzFile').value = '';
+        // fileLabel.textContent = 'Drag & drop KMZ/KML here';
+        // fileLabel.style.color = 'var(--text-muted)';
+        
+        // --- TETAP RESET HASIL PREVIEW & DOWNLOAD AREA ---
         document.getElementById('summaryContent').innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg><span>No data processed yet. Upload a file to see details.</span></div>';
         document.getElementById('status').innerHTML = '';
         document.getElementById('downloadArea').innerHTML = '';
         
-        // --- UPDATE: Reset kedua state ---
+        // --- RESET STATE & BATALIN SCRAPE ---
+        cancelScrape();
         resetLogicState();
         resetHPDBState(); 
         
-        processBtn.disabled = true;
+        // --- UPDATE PENTING: TOMBOL PROCESS DIBIKIN NYALA LAGI ---
+        if (kmzFile) {
+            processBtn.disabled = false; 
+        }
     });
 }
 
@@ -438,14 +445,11 @@ processBtn.addEventListener('click', async () => {
             generateAutoSlackSubfeeder(xmlDoc, enableAutoSlack400m);
             applyStyles(xmlDoc, 'subfeeder');
             injectDescriptionsAndCalc(xmlDoc, 'subfeeder', doCalc);
-        } else {
-
+} else {
             // CLUSTER LOGIC
             const res = restructureKML(xmlDoc);
             rootName = res.rootName;
-            if (doSmartRoute) {
-                processSmartRouting(xmlDoc, CURRENT_MODE); 
-            }
+            if (doSmartRoute) { processSmartRouting(xmlDoc, CURRENT_MODE); }
             autoRepositionPoints(xmlDoc, CURRENT_MODE); 
             splitSlingWires(xmlDoc);
             autoCorrectHierarchy(xmlDoc, CURRENT_MODE, enableAutoCorrectFolder); 
@@ -454,10 +458,11 @@ processBtn.addEventListener('click', async () => {
             injectDescriptionsAndCalc(xmlDoc, 'cluster', doCalc);
             organizeHpByBoundary(xmlDoc, usePolygonMaster);
             sortPlacemarksInsideFolders(xmlDoc, CURRENT_MODE);
-            generateExcelHPDB(xmlDoc, rootName);
+            
+            // KODE LAMA "generateExcelHPDB(xmlDoc, rootName);" UDAH GW HAPUS DARI SINI BIAR GA JALAN SENDIRI
         }
 
-    generateSummaryTable(xmlDoc);
+        generateSummaryTable(xmlDoc);
 
         const zipOut = new JSZip();
         zipOut.file("doc.kml", new XMLSerializer().serializeToString(xmlDoc));
@@ -475,51 +480,130 @@ processBtn.addEventListener('click', async () => {
         };
         dlArea.appendChild(dlBtn);
 
-        // REPLACE DARI SINI SAMPAI BAWAH SEBELUM statusEl.innerHTML = '✅ Done!';:
-                // --- 1. TOMBOL HPDB (HANYA UNTUK CLUSTER) ---
-        let xlsBtn;
+        // --- 1. UI HPDB & SCRAPE BUTTON (HANYA UNTUK CLUSTER) ---
+        let hpdbWrapper = null;
+        let xlsBtn = null;    
+        let scrapeBtn = null; 
+
         if (CURRENT_MODE === 'cluster') {
+            hpdbWrapper = document.createElement('div');
+            hpdbWrapper.className = 'hpdb-action-wrapper';
+
             xlsBtn = document.createElement('button');
             xlsBtn.className = 'btn-purple';
-            xlsBtn.style.marginTop = '8px';
-            xlsBtn.innerHTML = `<span class="loading-spinner" style="margin-right:8px;"></span> Generating HPDB...`;
-            xlsBtn.disabled = true; 
-            dlArea.appendChild(xlsBtn);
+            xlsBtn.style.flex = '1';
+            xlsBtn.style.margin = '0';
+            xlsBtn.innerHTML = `<span>Download HPDB (Excel)</span>`;
+            
+            scrapeBtn = document.createElement('button');
+            scrapeBtn.className = 'btn-icon-only';
+            scrapeBtn.title = "Scrape Full Address dari Google Maps";
+            scrapeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+
+            hpdbWrapper.appendChild(xlsBtn);
+            hpdbWrapper.appendChild(scrapeBtn);
+            dlArea.appendChild(hpdbWrapper);
+
+            const progressWrapper = document.createElement('div');
+            progressWrapper.className = 'progress-wrapper';
+            progressWrapper.innerHTML = `
+                <div class="progress-text">
+                    <span id="progLabel">Mempersiapkan...</span>
+                    <span id="progCount" style="color:var(--primary)">0/0</span>
+                </div>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" id="progFill"></div></div>
+                <button class="btn-cancel-mini" id="progCancel">Cancel Scraping</button>
+            `;
+            dlArea.appendChild(progressWrapper);
+
+            // LOGIC DOWNLOAD DEFAULT (HARDCODE BANDUNG)
+            xlsBtn.onclick = async () => {
+                xlsBtn.innerHTML = `<span class="loading-spinner"></span>`;
+                xlsBtn.disabled = true; scrapeBtn.disabled = true;
+                try {
+                    // AMBIL NAMA ROOT DINAMIS
+                    const docFolder = xmlDoc.querySelector('Document > Folder');
+                    const actualRootName = docFolder ? (docFolder.querySelector('name')?.textContent || rootName) : rootName;
+                    
+                    const excelBlob = await generateExcelHPDB(xmlDoc, actualRootName, null);
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(excelBlob);
+                    a.download = `HPDB_${kmzFile.name.replace(/\.k?mz|\.kml/i, '')}.xlsx`;
+                    a.click();
+                } catch (e) { 
+                    alert("Error: " + e.message); // UPDATE BIAR KETAHUAN ERRORNYA APA
+                    console.error("HPDB Default Error:", e);
+                }
+                xlsBtn.innerHTML = `<span>Download HPDB (Excel)</span>`;
+                xlsBtn.disabled = false; scrapeBtn.disabled = false;
+            };
+
+            // LOGIC DOWNLOAD + SCRAPE (TOMBOL PETIR)
+            scrapeBtn.onclick = async () => {
+                hpdbWrapper.style.display = 'none';
+                progressWrapper.style.display = 'flex';
+                
+                const progLabel = document.getElementById('progLabel');
+                const progCount = document.getElementById('progCount');
+                const progFill = document.getElementById('progFill');
+                const btnCancel = document.getElementById('progCancel');
+
+                const updateUI = (curr, tot, fatName) => {
+                    progLabel.textContent = `Scraping: ${fatName}`;
+                    progCount.textContent = `${curr}/${tot}`;
+                    progFill.style.width = `${(curr / tot) * 100}%`;
+                };
+
+                btnCancel.onclick = () => {
+                    cancelScrape(); 
+                    btnCancel.textContent = "Canceling...";
+                    btnCancel.disabled = true;
+                };
+
+                const scrapedData = await testScrapeFatAddresses(xmlDoc, updateUI);
+
+                if (scrapedData) {
+                    progLabel.textContent = "Generating Excel...";
+                    progFill.style.background = "#4ade80"; 
+                    try {
+                        const docFolder = xmlDoc.querySelector('Document > Folder');
+                        const actualRootName = docFolder ? (docFolder.querySelector('name')?.textContent || rootName) : rootName;
+                        
+                        const excelBlob = await generateExcelHPDB(xmlDoc, actualRootName, scrapedData);
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(excelBlob);
+                        a.download = `HPDB_${kmzFile.name.replace(/\.k?mz|\.kml/i, '')}_Scraped.xlsx`;
+                        a.click();
+                    } catch (e) { 
+                        alert("Error: " + e.message); 
+                        console.error("HPDB Scrape Error:", e);
+                    }
+                }
+
+                progressWrapper.style.display = 'none';
+                hpdbWrapper.style.display = 'flex';
+                progFill.style.width = '0%';
+                progFill.style.background = "var(--primary)";
+                btnCancel.textContent = "Cancel Scraping";
+                btnCancel.disabled = false;
+            };
         }
 
         // --- 2. TOMBOL BOQ (UNTUK CLUSTER & SUBFEEDER) ---
         const boqBtn = document.createElement('button');
         boqBtn.className = 'btn-purple';
         boqBtn.style.marginTop = '8px';
-        boqBtn.style.backgroundColor = '#d97706'; // Warna orange biar gampang dibedain
+        boqBtn.style.backgroundColor = '#d97706'; 
         boqBtn.style.borderColor = 'rgba(255,255,255,0.1)';
         boqBtn.innerHTML = `<span class="loading-spinner" style="margin-right:8px;"></span> Generating Auto BOQ...`;
         boqBtn.disabled = true;
         dlArea.appendChild(boqBtn);
 
         try {
-            // AMBIL NAMA ROOT DINAMIS SETELAH KML DI-RESTRUCTURE (Biar Subfeeder gak error)
             const docFolder = xmlDoc.querySelector('Document > Folder');
             const actualRootName = docFolder ? (docFolder.querySelector('name')?.textContent || rootName) : rootName;
 
-            // EKSEKUSI HPDB (JIKA MODE CLUSTER)
-            if (CURRENT_MODE === 'cluster' && xlsBtn) {
-                const excelBlob = await generateExcelHPDB(xmlDoc, actualRootName);
-                xlsBtn.innerHTML = `<span>Download HPDB (Excel)</span>`;
-                xlsBtn.disabled = false;
-                xlsBtn.onclick = () => {
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(excelBlob);
-                    a.download = `HPDB_${kmzFile.name.replace(/\.k?mz|\.kml/i, '')}.xlsx`;
-                    a.click();
-                };
-            }
-
-            // EKSEKUSI BOQ (JALAN DI KEDUA MODE)
-            // Passing parameter CURRENT_MODE ke script extractor
             const boqData = extractBOQData(xmlDoc, actualRootName, CURRENT_MODE);
-            
-            // Tentukan path template berdasarkan mode
             const tplPath = CURRENT_MODE === 'subfeeder' ? 'assets/template_sfBOQ.xlsx' : 'assets/template_clrBOQ.xlsx';
             const tplRes = await fetch(tplPath);
             
@@ -527,7 +611,6 @@ processBtn.addEventListener('click', async () => {
             const tplBuffer = await tplRes.arrayBuffer();
 
             const boqWorker = new Worker('js/boq.worker.js');
-            // Oper mode ke worker barengan sama data biar worker tau mapping Excel mana yang dipake
             boqWorker.postMessage({ boqData, templateBuffer: tplBuffer, mode: CURRENT_MODE }, [tplBuffer]);
 
             boqWorker.onmessage = (e) => {
@@ -538,7 +621,6 @@ processBtn.addEventListener('click', async () => {
                     boqBtn.onclick = () => {
                         const a = document.createElement('a');
                         a.href = URL.createObjectURL(blob);
-                        // Bikin penamaan file outputnya beda dikit biar enak ngeceknya
                         const prefix = CURRENT_MODE === 'subfeeder' ? 'BOQ_SF_' : 'BOQ_CLR_';
                         a.download = `${prefix}${kmzFile.name.replace(/\.k?mz|\.kml/i, '')}.xlsx`;
                         a.click();
@@ -548,7 +630,7 @@ processBtn.addEventListener('click', async () => {
                     console.error("BOQ Worker Error:", e.data.error);
                     statusEl.innerHTML = `<span style="color:#ef4444; font-weight:bold;">❌ Gagal Generate BOQ: Cek Console</span>`;
                 }
-                boqWorker.terminate(); // Bunuh worker kalau udah beres
+                boqWorker.terminate(); 
             };
 
             boqWorker.onerror = (err) => {
@@ -558,26 +640,21 @@ processBtn.addEventListener('click', async () => {
             }
 
         } catch (err) {
-            // Tangkap error strict rule KML di sini
-            if (xlsBtn) xlsBtn.innerHTML = `<span>❌ Error Terjadi</span>`;
             boqBtn.innerHTML = `<span>❌ BOQ Batal</span>`;
             statusEl.innerHTML = `<span style="color:#ef4444; font-weight:bold;">${err.message}</span>`;
             console.error("Kesalahan Proses:", err);
         }
         
-        // Cek strict rule jika lolos:
         if (!statusEl.innerHTML.includes("❌")) {
             statusEl.innerHTML = '✅ Done!';
         }
  
-        statusEl.innerHTML = '✅ Done!';
     } catch (err) {
         statusEl.innerHTML = `<span style="color:red">Error: ${err.message}</span>`;
         console.error(err);
     } finally {
         processBtn.disabled = false;
-    }
-});
+    }});
 
 const resizer = document.getElementById('dragMe');
 const leftPanel = document.getElementById('panelLeft');

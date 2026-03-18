@@ -118,7 +118,7 @@ self.onmessage = async function(e) {
                 if (stat.count < 10) { statusTxt = "⚠️ UNDER"; isWarning = true; }
                 if (stat.count > 16) { statusTxt = "❌ OVER"; isWarning = true; }
 
-                wsMaster.getCell(dRow, dashboardStartCol).value = ""; // FAT_STREET_NAME (Manual nantinya)
+                wsMaster.getCell(dRow, dashboardStartCol).value = stat.streetName || ""; // FAT_STREET_NAME
                 wsMaster.getCell(dRow, dashboardStartCol + 1).value = stat.fatName.slice(-3); // FAT_ID_KEY
                 wsMaster.getCell(dRow, dashboardStartCol + 2).value = stat.count; // TOTAL_HP
                 
@@ -401,14 +401,14 @@ self.onmessage = async function(e) {
                     rowValues[7] = idx + 1; 
                     rowValues[8] = hp.poleId; 
                     rowValues[9] = hp.poleLat; 
-                    rowValues[10] = hp.poleLon; 
+                    rowValues[10] = hp.poleLon;
                     
-                    rowValues[12] = "JAWA BARAT"; 
-                    rowValues[13] = "BANDUNG"; 
-                    rowValues[14] = "REGOL"; 
-                    rowValues[15] = "BALONGGEDE"; 
-                    rowValues[16] = "40251"; 
-                    rowValues[22] = "BANDUNG"; 
+                    rowValues[12] = hp.provinsi; // M9
+                    rowValues[13] = hp.kabupaten; // N9
+                    rowValues[14] = hp.kecamatan; // O9
+                    rowValues[15] = hp.desa; // P9
+                    rowValues[16] = hp.kodepos; // Q9 
+                    rowValues[22] = hp.kabupaten; // N9 
                     rowValues[24] = "GRAND MOSQUE OF BANDUNG"; 
                     rowValues[25] = "GRAND MOSQUE OF BANDUNG"; 
                     rowValues[26] = "10"; 
@@ -420,6 +420,10 @@ self.onmessage = async function(e) {
                     rowValues[45] = fatCode; 
                     rowValues[47] = hp.hpLat; 
                     rowValues[48] = hp.hpLon; 
+
+                    // Logika Potong "JALAN" untuk Kolom AD9 (Index 29)
+                    let cleanStreet = (hp.streetName || "").replace(/^(JALAN\s+|GANG\s+|GG\.\s+)/i, '').trim();
+                    rowValues[29] = cleanStreet; // AD9
                     
                     row.values = rowValues;
 
